@@ -1,32 +1,37 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { PollsList } from '@/components/polls/polls-list';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Poll } from '@/types';
-import { filterPollsByStatus } from '@/utils/poll-utils';
-import { toast } from 'sonner';
-import { Plus, BarChart3, Users, Clock } from 'lucide-react';
-import Link from 'next/link';
-import { useAuth } from '@/contexts/auth-context';
-import { supabaseClient } from '@/lib/supabase';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Poll } from "@/types";
+import { PollWithOptions } from "@/types/database";
+import { filterPollsByStatus } from "@/utils/poll-utils";
+import { toast } from "sonner";
+import { Plus, BarChart3, Users, Clock, Edit, Trash2, Eye } from "lucide-react";
+import Link from "next/link";
+import { useAuth } from "@/contexts/auth-context";
+import { PollService } from "@/lib/services/poll-service";
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const [polls, setPolls] = useState<Poll[]>([]);
+  const [polls, setPolls] = useState<PollWithOptions[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [userVotes, setUserVotes] = useState<Record<string, string[]>>({});
+  const [deletingPollId, setDeletingPollId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
-      router.push('/auth/login');
+      router.push("/auth/login");
     } else {
       fetchUserPolls();
-      fetchUserVotes();
     }
   }, [user, router]);
 
@@ -34,80 +39,61 @@ export default function DashboardPage() {
     if (!user) return;
     try {
       setIsLoading(true);
-      const { data, error } = await supabaseClient
-        .from('polls')
-        .select('*')
-        .eq('user_id', user.id);
-      
-      if (error) {
-        throw new Error('Failed to fetch your polls');
-      }
-      
-      setPolls(data as Poll[]);
+      const userPolls = await PollService.getUserPolls(user.id);
+      setPolls(userPolls);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load your polls';
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to load your polls";
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const fetchUserVotes = async () => {
-    if (!user) return;
+  const handleDeletePoll = async (pollId: string) => {
+    if (
+      !user ||
+      !confirm(
+        "Are you sure you want to delete this poll? This action cannot be undone."
+      )
+    )
+      return;
+
     try {
-      const { data, error } = await supabaseClient
-        .from('votes')
-        .select('poll_id, selected_options')
-        .eq('user_id', user.id);
-
-      if (error) {
-        throw new Error('Failed to fetch user votes');
-      }
-
-      const votesData = data.reduce((acc, vote) => {
-        acc[vote.poll_id] = vote.selected_options;
-        return acc;
-      }, {} as Record<string, string[]>);
-      
-      setUserVotes(votesData);
+      setDeletingPollId(pollId);
+      await PollService.deletePoll(pollId, user.id);
+      toast.success("Poll deleted successfully!");
+      await fetchUserPolls(); // Refresh the list
     } catch (err) {
-      console.error('Failed to fetch user votes:', err);
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to delete poll";
+      toast.error(errorMessage);
+    } finally {
+      setDeletingPollId(null);
     }
   };
 
-  const handleVote = async (pollId: string, optionIds: string[]) => {
+  const handleTogglePollStatus = async (pollId: string) => {
     if (!user) return;
+
     try {
-      const { error } = await supabaseClient
-        .from('votes')
-        .upsert({ poll_id: pollId, user_id: user.id, selected_options: optionIds }, { onConflict: 'poll_id, user_id' });
-
-      if (error) {
-        throw new Error('Failed to submit vote');
-      }
-
-      // Update local state
-      setUserVotes(prev => ({
-        ...prev,
-        [pollId]: optionIds
-      }));
-      
-      // Refresh polls
-      await fetchUserPolls();
-      
-      toast.success('Vote submitted successfully!');
+      await PollService.togglePollStatus(pollId, user.id);
+      toast.success("Poll status updated successfully!");
+      await fetchUserPolls(); // Refresh the list
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to submit vote';
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to update poll status";
       toast.error(errorMessage);
-      throw err;
     }
   };
 
   const getStats = () => {
-    const activePolls = filterPollsByStatus(polls, 'active').length;
-    const expiredPolls = filterPollsByStatus(polls, 'expired').length;
-    const totalVotes = polls.reduce((sum, poll) => sum + (poll.totalVotes || 0), 0);
-    
+    const activePolls = polls.filter((poll) => poll.is_active).length;
+    const expiredPolls = polls.filter(
+      (poll) => poll.expires_at && new Date(poll.expires_at) < new Date()
+    ).length;
+    const totalVotes = polls.reduce((sum, poll) => sum + poll.total_votes, 0);
+
     return {
       totalPolls: polls.length,
       activePolls,
@@ -133,7 +119,7 @@ export default function DashboardPage() {
               Manage your polls and track engagement
             </p>
           </div>
-          
+
           <Button asChild>
             <Link href="/polls/create">
               <Plus className="h-4 w-4 mr-2" />
@@ -152,14 +138,16 @@ export default function DashboardPage() {
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalPolls}</div>
               <p className="text-xs text-muted-foreground">
-                Polls you've created
+                Polls you&apos;ve created
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Polls</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Active Polls
+              </CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -185,7 +173,9 @@ export default function DashboardPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Expired Polls</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Expired Polls
+              </CardTitle>
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -203,7 +193,8 @@ export default function DashboardPage() {
             <CardHeader>
               <CardTitle>Welcome to Polly!</CardTitle>
               <CardDescription>
-                You haven't created any polls yet. Get started by creating your first poll.
+                You haven&apos;t created any polls yet. Get started by creating
+                your first poll.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -215,9 +206,7 @@ export default function DashboardPage() {
                   </Link>
                 </Button>
                 <Button variant="outline" asChild>
-                  <Link href="/polls">
-                    Browse Public Polls
-                  </Link>
+                  <Link href="/polls">Browse Public Polls</Link>
                 </Button>
               </div>
             </CardContent>
@@ -228,13 +217,96 @@ export default function DashboardPage() {
         {polls.length > 0 && (
           <div>
             <h2 className="text-2xl font-bold mb-6">Your Polls</h2>
-            <PollsList
-              polls={polls}
-              onVote={handleVote}
-              userVotes={userVotes}
-              isLoading={isLoading}
-              showCreateButton={false}
-            />
+            <div className="grid gap-6">
+              {polls.map((poll) => (
+                <Card key={poll.id} className="w-full">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <CardTitle className="text-xl">{poll.title}</CardTitle>
+                        {poll.description && (
+                          <CardDescription className="mt-2">
+                            {poll.description}
+                          </CardDescription>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 ml-4">
+                        <Badge
+                          variant={poll.is_active ? "default" : "secondary"}
+                        >
+                          {poll.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                        {poll.expires_at &&
+                          new Date(poll.expires_at) < new Date() && (
+                            <Badge variant="destructive">Expired</Badge>
+                          )}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {/* Poll Options */}
+                      <div className="space-y-2">
+                        {poll.poll_options.map((option) => (
+                          <div
+                            key={option.id}
+                            className="flex justify-between items-center p-3 bg-muted rounded-lg"
+                          >
+                            <span>{option.text}</span>
+                            <Badge variant="outline">
+                              {option.votes_count} votes
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Poll Stats */}
+                      <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>Total votes: {poll.total_votes}</span>
+                        <span>
+                          Created:{" "}
+                          {new Date(poll.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-2 pt-4">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/polls/${poll.id}`}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            View
+                          </Link>
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/polls/${poll.id}/edit`}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </Link>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleTogglePollStatus(poll.id)}
+                        >
+                          {poll.is_active ? "Deactivate" : "Activate"}
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeletePoll(poll.id)}
+                          disabled={deletingPollId === poll.id}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          {deletingPollId === poll.id
+                            ? "Deleting..."
+                            : "Delete"}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
         )}
       </div>

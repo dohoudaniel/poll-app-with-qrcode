@@ -1,15 +1,21 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { PollCard } from './poll-card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Poll, PollStatus } from '@/types';
-import { filterPollsByStatus, sortPollsByDate } from '@/utils/poll-utils';
-import { Search, Filter, Plus } from 'lucide-react';
-import Link from 'next/link';
+import { useState, useEffect } from "react";
+import { PollCard } from "./poll-card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Poll, PollStatus } from "@/types";
+import { filterPollsByStatus, sortPollsByDate } from "@/utils/poll-utils";
+import { Search, Filter, Plus } from "lucide-react";
+import Link from "next/link";
 
 interface PollsListProps {
   polls: Poll[];
@@ -20,17 +26,19 @@ interface PollsListProps {
   isLoading?: boolean;
 }
 
-export function PollsList({ 
-  polls, 
-  onVote, 
-  currentUserId, 
+export function PollsList({
+  polls,
+  onVote,
+  currentUserId,
   userVotes = {},
   showCreateButton = true,
-  isLoading = false
+  isLoading = false,
 }: PollsListProps) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<PollStatus | 'all'>('all');
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'most-voted'>('newest');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<PollStatus | "all">("all");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "most-voted">(
+    "newest"
+  );
   const [filteredPolls, setFilteredPolls] = useState<Poll[]>(polls);
 
   useEffect(() => {
@@ -38,28 +46,30 @@ export function PollsList({
 
     // Apply search filter
     if (searchTerm) {
-      filtered = filtered.filter(poll => 
-        poll.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        poll.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      filtered = filtered.filter(
+        (poll) =>
+          poll.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          poll.description?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
     // Apply status filter
-    if (statusFilter !== 'all') {
+    if (statusFilter !== "all") {
       filtered = filterPollsByStatus(filtered, statusFilter);
     }
 
     // Apply sorting
     switch (sortBy) {
-      case 'newest':
+      case "newest":
         filtered = sortPollsByDate(filtered);
         break;
-      case 'oldest':
-        filtered = [...filtered].sort((a, b) => 
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      case "oldest":
+        filtered = [...filtered].sort(
+          (a, b) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         );
         break;
-      case 'most-voted':
+      case "most-voted":
         filtered = [...filtered].sort((a, b) => b.totalVotes - a.totalVotes);
         break;
     }
@@ -68,10 +78,10 @@ export function PollsList({
   }, [polls, searchTerm, statusFilter, sortBy]);
 
   const getStatusCounts = () => {
-    const active = filterPollsByStatus(polls, 'active').length;
-    const expired = filterPollsByStatus(polls, 'expired').length;
-    const draft = filterPollsByStatus(polls, 'draft').length;
-    
+    const active = filterPollsByStatus(polls, "active").length;
+    const expired = filterPollsByStatus(polls, "expired").length;
+    const draft = filterPollsByStatus(polls, "draft").length;
+
     return { active, expired, draft, total: polls.length };
   };
 
@@ -91,10 +101,13 @@ export function PollsList({
             </Button>
           )}
         </div>
-        
+
         <div className="space-y-4">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-48 bg-gray-100 rounded-lg animate-pulse" />
+            <div
+              key={i}
+              className="h-48 bg-gray-100 rounded-lg animate-pulse"
+            />
           ))}
         </div>
       </div>
@@ -111,7 +124,7 @@ export function PollsList({
             {statusCounts.total} total polls
           </p>
         </div>
-        
+
         {showCreateButton && (
           <Button asChild>
             <Link href="/polls/create">
@@ -146,8 +159,11 @@ export function PollsList({
             className="pl-10"
           />
         </div>
-        
-        <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+
+        <Select
+          value={statusFilter}
+          onValueChange={(value: string) => setStatusFilter(value)}
+        >
           <SelectTrigger className="w-full sm:w-40">
             <Filter className="h-4 w-4 mr-2" />
             <SelectValue placeholder="Filter by status" />
@@ -159,8 +175,11 @@ export function PollsList({
             <SelectItem value="draft">Draft</SelectItem>
           </SelectContent>
         </Select>
-        
-        <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+
+        <Select
+          value={sortBy}
+          onValueChange={(value: string) => setSortBy(value)}
+        >
           <SelectTrigger className="w-full sm:w-40">
             <SelectValue placeholder="Sort by" />
           </SelectTrigger>
@@ -177,12 +196,11 @@ export function PollsList({
         {filteredPolls.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-muted-foreground mb-4">
-              {searchTerm || statusFilter !== 'all' 
-                ? 'No polls match your filters' 
-                : 'No polls found'
-              }
+              {searchTerm || statusFilter !== "all"
+                ? "No polls match your filters"
+                : "No polls found"}
             </div>
-            {showCreateButton && !searchTerm && statusFilter === 'all' && (
+            {showCreateButton && !searchTerm && statusFilter === "all" && (
               <Button asChild>
                 <Link href="/polls/create">
                   <Plus className="h-4 w-4 mr-2" />

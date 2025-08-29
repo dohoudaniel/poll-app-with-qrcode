@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,12 +12,12 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
-import { User, Settings, LogOut, Plus, BarChart3, Home } from 'lucide-react';
-import { getUserInitials, getUserDisplayName } from '@/utils/auth-utils';
-import { useAuth } from '@/contexts/auth-context';
-import { supabaseClient } from '@/lib/supabase';
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { User, Settings, LogOut, Plus, BarChart3, Home } from "lucide-react";
+import { getUserInitials, getUserDisplayName } from "@/utils/auth-utils";
+import { useAuth } from "@/contexts/auth-context";
+import { supabase } from "@/lib/supabase";
 
 export function Header() {
   const { user } = useAuth();
@@ -27,10 +27,10 @@ export function Header() {
   const handleLogout = async () => {
     setIsLoading(true);
     try {
-      await supabaseClient.auth.signOut();
-      router.push('/auth/login');
+      await supabase.auth.signOut();
+      router.push("/auth/login");
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error("Logout failed:", error);
     } finally {
       setIsLoading(false);
     }
@@ -83,11 +83,21 @@ export function Header() {
                 {/* User Menu */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <Button
+                      variant="ghost"
+                      className="relative h-8 w-8 rounded-full"
+                    >
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={user.user_metadata.avatar_url} alt={user.email} />
+                        <AvatarImage
+                          src={user.user_metadata.avatar_url}
+                          alt={user.email}
+                        />
                         <AvatarFallback>
-                          {getUserInitials(user.user_metadata.first_name, user.user_metadata.last_name, user.email)}
+                          {getUserInitials(
+                            user.user_metadata.first_name,
+                            user.user_metadata.last_name,
+                            user.email
+                          )}
                         </AvatarFallback>
                       </Avatar>
                     </Button>
@@ -96,7 +106,11 @@ export function Header() {
                     <DropdownMenuLabel className="font-normal">
                       <div className="flex flex-col space-y-1">
                         <p className="text-sm font-medium leading-none">
-                          {getUserDisplayName(user.user_metadata.first_name, user.user_metadata.last_name, user.email)}
+                          {getUserDisplayName(
+                            user.user_metadata.first_name,
+                            user.user_metadata.last_name,
+                            user.email
+                          )}
                         </p>
                         <p className="text-xs leading-none text-muted-foreground">
                           {user.email}
@@ -142,7 +156,7 @@ export function Header() {
                       disabled={isLoading}
                     >
                       <LogOut className="mr-2 h-4 w-4" />
-                      {isLoading ? 'Logging out...' : 'Log out'}
+                      {isLoading ? "Logging out..." : "Log out"}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>

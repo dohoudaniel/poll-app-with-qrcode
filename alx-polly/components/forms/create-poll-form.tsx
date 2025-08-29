@@ -45,12 +45,16 @@ interface CreatePollFormProps {
   onSubmit: (data: CreatePollFormData) => Promise<void>;
   isLoading?: boolean;
   error?: string;
+  initialData?: CreatePollFormData;
+  isEditing?: boolean;
 }
 
 export function CreatePollForm({
   onSubmit,
   isLoading = false,
   error,
+  initialData,
+  isEditing = false,
 }: CreatePollFormProps) {
   const [formError, setFormError] = useState<string>("");
 
@@ -63,11 +67,13 @@ export function CreatePollForm({
   } = useForm<CreatePollFormFields>({
     resolver: zodResolver(createPollSchema),
     defaultValues: {
-      title: "",
-      description: "",
-      options: ["", ""],
-      allowMultipleVotes: false,
-      isAnonymous: true,
+      title: initialData?.title || "",
+      description: initialData?.description || "",
+      options: initialData?.options || ["", ""],
+      expiresAt: initialData?.expiresAt,
+      allowMultipleVotes: initialData?.allowMultipleVotes || false,
+      isAnonymous:
+        initialData?.isAnonymous !== undefined ? initialData.isAnonymous : true,
     },
   });
 
@@ -172,17 +178,26 @@ export function CreatePollForm({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <Label>Poll Options *</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addOption}
-                disabled={fields.length >= 10 || isLoading}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Option
-              </Button>
+              {!isEditing && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addOption}
+                  disabled={fields.length >= 10 || isLoading}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Option
+                </Button>
+              )}
             </div>
+
+            {isEditing && (
+              <p className="text-sm text-muted-foreground">
+                Options cannot be modified after poll creation to preserve vote
+                integrity.
+              </p>
+            )}
 
             <div className="space-y-3">
               {fields.map((field, index) => (
@@ -191,7 +206,7 @@ export function CreatePollForm({
                     <Input
                       placeholder={`Option ${index + 1}`}
                       {...register(`options.${index}`)}
-                      disabled={isLoading}
+                      disabled={isLoading || isEditing}
                     />
                     {errors.options?.[index] && (
                       <p className="text-sm text-red-500 mt-1">
@@ -200,7 +215,7 @@ export function CreatePollForm({
                     )}
                   </div>
 
-                  {fields.length > 2 && (
+                  {fields.length > 2 && !isEditing && (
                     <Button
                       type="button"
                       variant="outline"
@@ -274,7 +289,13 @@ export function CreatePollForm({
           {/* Submit Button */}
           <div className="flex gap-3 pt-4">
             <Button type="submit" className="flex-1" disabled={isLoading}>
-              {isLoading ? "Creating Poll..." : "Create Poll"}
+              {isLoading
+                ? isEditing
+                  ? "Updating Poll..."
+                  : "Creating Poll..."
+                : isEditing
+                ? "Update Poll"
+                : "Create Poll"}
             </Button>
 
             <Button

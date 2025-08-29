@@ -1,43 +1,54 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { CreatePollForm } from '@/components/forms/create-poll-form';
-import { CreatePollFormData } from '@/types';
-import { toast } from 'sonner';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { CreatePollForm } from "@/components/forms/create-poll-form";
+import { CreatePollFormData } from "@/types";
+import { toast } from "sonner";
 
 export default function CreatePollPage() {
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string>("");
   const router = useRouter();
 
   const handleCreatePoll = async (data: CreatePollFormData) => {
     setIsLoading(true);
-    setError('');
+    setError("");
 
     try {
       // TODO: Replace with actual API call
-      const response = await fetch('/api/polls', {
-        method: 'POST',
+      const response = await fetch("/api/polls", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(data),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create poll');
+        if (response.status === 401) {
+          // Handle authentication error
+          toast.error(
+            errorData.error || "You must be logged in to create a poll"
+          );
+          router.push(errorData.redirectTo || "/auth/login");
+          return;
+        }
+        throw new Error(
+          errorData.error || errorData.message || "Failed to create poll"
+        );
       }
 
       const result = await response.json();
-      
-      toast.success('Poll created successfully!');
-      
-      // Redirect to the newly created poll
-      router.push(`/polls/${result.id}`);
+
+      toast.success("Poll created successfully!");
+
+      // Redirect to polls list page
+      router.push("/polls");
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create poll';
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to create poll";
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -56,8 +67,8 @@ export default function CreatePollPage() {
             Ask questions, gather opinions, and make decisions together
           </p>
         </div>
-        
-        <CreatePollForm 
+
+        <CreatePollForm
           onSubmit={handleCreatePoll}
           isLoading={isLoading}
           error={error}
