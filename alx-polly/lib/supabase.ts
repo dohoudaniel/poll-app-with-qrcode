@@ -10,7 +10,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+  },
+});
 
 // Helper function to get the current user
 export const getCurrentUser = async () => {
@@ -23,6 +29,15 @@ export const getCurrentUser = async () => {
     if (error) {
       console.error("Error getting session:", error);
       return null;
+    }
+
+    // Additional check to ensure the session is valid
+    if (session?.user && session.expires_at) {
+      const now = Math.floor(Date.now() / 1000);
+      if (session.expires_at < now) {
+        console.log("Session expired");
+        return null;
+      }
     }
 
     return session?.user || null;

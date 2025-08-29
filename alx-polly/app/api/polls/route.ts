@@ -43,9 +43,26 @@ export async function GET(request: NextRequest) {
 // POST /api/polls - Create a new poll
 export async function POST(request: NextRequest) {
   try {
-    // Get the current user
-    const user = await getCurrentUser();
-    if (!user) {
+    // Get the authorization header
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json(
+        {
+          error: "You must be logged in to create a poll",
+          redirectTo: "/auth/login",
+        },
+        { status: 401 }
+      );
+    }
+
+    // Extract the token and verify the user
+    const token = authHeader.replace("Bearer ", "");
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser(token);
+
+    if (error || !user) {
       return NextResponse.json(
         {
           error: "You must be logged in to create a poll",

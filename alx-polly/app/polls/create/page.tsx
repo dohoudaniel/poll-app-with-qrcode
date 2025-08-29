@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { CreatePollForm } from "@/components/forms/create-poll-form";
 import { CreatePollFormData } from "@/types";
 import { toast } from "sonner";
+import { ProtectedRoute } from "@/components/auth/protected-route";
+import { api } from "@/lib/api-client";
 
-export default function CreatePollPage() {
+function CreatePollContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
   const router = useRouter();
@@ -16,35 +18,9 @@ export default function CreatePollPage() {
     setError("");
 
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch("/api/polls", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        if (response.status === 401) {
-          // Handle authentication error
-          toast.error(
-            errorData.error || "You must be logged in to create a poll"
-          );
-          router.push(errorData.redirectTo || "/auth/login");
-          return;
-        }
-        throw new Error(
-          errorData.error || errorData.message || "Failed to create poll"
-        );
-      }
-
-      const result = await response.json();
-
+      // Use the authenticated API client
+      const result = await api.post("/api/polls", data);
       toast.success("Poll created successfully!");
-
-      // Redirect to polls list page
       router.push("/polls");
     } catch (err) {
       const errorMessage =
@@ -75,5 +51,13 @@ export default function CreatePollPage() {
         />
       </div>
     </div>
+  );
+}
+
+export default function CreatePollPage() {
+  return (
+    <ProtectedRoute>
+      <CreatePollContent />
+    </ProtectedRoute>
   );
 }

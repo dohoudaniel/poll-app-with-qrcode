@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RegisterFormData } from "@/types";
-import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
 
 const registerSchema = z
@@ -41,6 +41,7 @@ export function RegisterForm() {
   const [error, setError] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const router = useRouter();
+  const { signUp } = useAuth();
 
   const {
     register,
@@ -54,19 +55,10 @@ export function RegisterForm() {
     setIsLoading(true);
     setError("");
     try {
-      const { error } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          data: {
-            username: data.username,
-            first_name: data.firstName,
-            last_name: data.lastName,
-          },
-        },
-      });
+      const { error } = await signUp(data.email, data.password, data.username);
       if (error) {
         setError(error.message);
+        toast.error(error.message);
       } else {
         toast.success(
           "Registration successful! Please check your email to verify your account."
@@ -74,7 +66,12 @@ export function RegisterForm() {
         router.push("/auth/login");
       }
     } catch (err) {
-      setError("An unexpected error occurred. Please try again.");
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "An unexpected error occurred. Please try again.";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

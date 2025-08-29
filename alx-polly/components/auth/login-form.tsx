@@ -20,7 +20,8 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LoginFormData } from "@/types";
-import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/auth-context";
+import { toast } from "sonner";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -31,6 +32,7 @@ export function LoginForm() {
   const [error, setError] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const router = useRouter();
+  const { signIn } = useAuth();
 
   const {
     register,
@@ -44,14 +46,21 @@ export function LoginForm() {
     setIsLoading(true);
     setError("");
     try {
-      const { error } = await supabase.auth.signInWithPassword(data);
+      const { error } = await signIn(data.email, data.password);
       if (error) {
         setError(error.message);
+        toast.error(error.message);
       } else {
+        // Success toast is handled by auth context
         router.push("/dashboard");
       }
     } catch (err) {
-      setError("An unexpected error occurred. Please try again.");
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "An unexpected error occurred. Please try again.";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

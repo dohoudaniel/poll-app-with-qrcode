@@ -19,8 +19,9 @@ import { Plus, BarChart3, Users, Clock, Edit, Trash2, Eye } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
 import { PollService } from "@/lib/services/poll-service";
+import { ProtectedRoute } from "@/components/auth/protected-route";
 
-export default function DashboardPage() {
+function DashboardContent() {
   const { user } = useAuth();
   const router = useRouter();
   const [polls, setPolls] = useState<PollWithOptions[]>([]);
@@ -28,12 +29,10 @@ export default function DashboardPage() {
   const [deletingPollId, setDeletingPollId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) {
-      router.push("/auth/login");
-    } else {
+    if (user) {
       fetchUserPolls();
     }
-  }, [user, router]);
+  }, [user]);
 
   const fetchUserPolls = async () => {
     if (!user) return;
@@ -311,5 +310,13 @@ export default function DashboardPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <ProtectedRoute>
+      <DashboardContent />
+    </ProtectedRoute>
   );
 }

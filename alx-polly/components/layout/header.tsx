@@ -17,17 +17,16 @@ import { Badge } from "@/components/ui/badge";
 import { User, Settings, LogOut, Plus, BarChart3, Home } from "lucide-react";
 import { getUserInitials, getUserDisplayName } from "@/utils/auth-utils";
 import { useAuth } from "@/contexts/auth-context";
-import { supabase } from "@/lib/supabase";
 
 export function Header() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogout = async () => {
     setIsLoading(true);
     try {
-      await supabase.auth.signOut();
+      await signOut();
       router.push("/auth/login");
     } catch (error) {
       console.error("Logout failed:", error);
