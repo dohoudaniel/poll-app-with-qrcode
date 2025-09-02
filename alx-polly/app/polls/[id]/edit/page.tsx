@@ -1,95 +1,116 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { CreatePollForm } from '@/components/forms/create-poll-form';
-import { PollService } from '@/lib/services/poll-service';
-import { useAuth } from '@/contexts/auth-context';
-import { toast } from 'sonner';
-import { CreatePollFormData } from '@/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { EditPollForm } from "@/components/forms/edit-poll-form";
+import { PollService } from "@/lib/services/poll-service";
+import { useAuth } from "@/contexts/auth-context";
+import { toast } from "sonner";
+import { EditPollFormData } from "@/types";
+import { PollWithOptions } from "@/types/database";
+import { api } from "@/lib/api-client";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
 
 export default function EditPollPage() {
   const { user } = useAuth();
   const router = useRouter();
   const params = useParams();
   const pollId = params.id as string;
-  
+
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingPoll, setIsLoadingPoll] = useState(true);
-  const [error, setError] = useState<string>('');
-  const [initialData, setInitialData] = useState<CreatePollFormData | null>(null);
+  const [error, setError] = useState<string>("");
+  const [pollData, setPollData] = useState<EditPollFormData | null>(null);
 
   useEffect(() => {
     if (!user) {
-      router.push('/auth/login');
+      router.push("/auth/login");
       return;
     }
-    
+
     fetchPoll();
   }, [user, pollId, router]);
 
   const fetchPoll = async () => {
     try {
       setIsLoadingPoll(true);
-      const poll = await PollService.getPollById(pollId);
-      
+      // Use authenticated API client to fetch poll details
+      const poll = await api.get<PollWithOptions>(`/api/polls/${pollId}`);
+
       if (!poll) {
-        toast.error('Poll not found');
-        router.push('/dashboard');
+        toast.error("Poll not found");
+        router.push("/dashboard");
         return;
       }
-      
+
       // Check if user owns this poll
       if (poll.created_by !== user?.id) {
-        toast.error('You can only edit your own polls');
-        router.push('/dashboard');
+        toast.error("You can only edit your own polls");
+        router.push("/dashboard");
         return;
       }
-      
-      // Convert poll data to form format
-      const formData: CreatePollFormData = {
+
+      // Convert poll data to EditPollFormData format
+      const editData: EditPollFormData = {
+        id: poll.id,
         title: poll.title,
         description: poll.description || undefined,
-        options: poll.poll_options.map(option => option.text),
+        options: poll.poll_options.map((option) => ({
+          id: option.id,
+          text: option.text,
+          votes: option.votes_count,
+          pollId: poll.id,
+        })),
         expiresAt: poll.expires_at ? new Date(poll.expires_at) : undefined,
         allowMultipleVotes: poll.allow_multiple_votes,
         isAnonymous: poll.is_anonymous,
+        isActive: poll.is_active,
+        createdAt: new Date(poll.created_at),
+        updatedAt: new Date(poll.updated_at),
       };
-      
-      setInitialData(formData);
+
+      setPollData(editData);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load poll';
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to load poll";
       toast.error(errorMessage);
-      router.push('/dashboard');
+      router.push("/dashboard");
     } finally {
       setIsLoadingPoll(false);
     }
   };
 
-  const handleSubmit = async (data: CreatePollFormData) => {
-    if (!user) return;
-    
+  const handleSubmit = async (data: Partial<EditPollFormData>) => {
+    if (!user || !pollData) return;
+
     setIsLoading(true);
-    setError('');
+    setError("");
 
     try {
-      // Update the poll
-      await PollService.updatePoll(pollId, {
+      // Update the poll using authenticated API client
+      await api.put(`/api/polls/${pollId}`, {
         title: data.title,
         description: data.description || null,
         expires_at: data.expiresAt ? data.expiresAt.toISOString() : null,
         allow_multiple_votes: data.allowMultipleVotes,
         is_anonymous: data.isAnonymous,
-      }, user.id);
+        is_active: data.isActive,
+      });
 
-      toast.success('Poll updated successfully!');
-      router.push('/dashboard');
+      toast.success("Poll updated successfully!");
+      router.push("/dashboard");
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update poll';
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to update poll";
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -112,7 +133,7 @@ export default function EditPollPage() {
     );
   }
 
-  if (!initialData) {
+  if (!pollData) {
     return null;
   }
 
@@ -126,7 +147,7 @@ export default function EditPollPage() {
               Back to Dashboard
             </Link>
           </Button>
-          
+
           <div className="text-center">
             <h1 className="text-3xl font-bold text-gray-900">Edit Poll</h1>
             <p className="mt-2 text-gray-600">
@@ -135,23 +156,12 @@ export default function EditPollPage() {
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Poll Details</CardTitle>
-            <CardDescription>
-              Note: You can update the poll details, but options cannot be modified after creation to preserve vote integrity.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <CreatePollForm
-              onSubmit={handleSubmit}
-              isLoading={isLoading}
-              error={error}
-              initialData={initialData}
-              isEditing={true}
-            />
-          </CardContent>
-        </Card>
+        <EditPollForm
+          poll={pollData}
+          onSubmit={handleSubmit}
+          isLoading={isLoading}
+          error={error}
+        />
       </div>
     </div>
   );

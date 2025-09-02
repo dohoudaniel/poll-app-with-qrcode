@@ -1,26 +1,37 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { PollCard } from '@/components/polls/poll-card';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Poll } from '@/types';
-import { toast } from 'sonner';
-import { ArrowLeft, Share2, QrCode } from 'lucide-react';
-import Link from 'next/link';
+import { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { PollCard } from "@/components/polls/poll-card";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Poll } from "@/types";
+import { PollWithOptions } from "@/types/database";
+import { toast } from "sonner";
+import { ArrowLeft, Share2, QrCode } from "lucide-react";
+import Link from "next/link";
+import { api } from "@/lib/api-client";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function PollPage() {
   const params = useParams();
   const router = useRouter();
   const pollId = params.id as string;
-  
-  const [poll, setPoll] = useState<Poll | null>(null);
+
+  const { user } = useAuth();
+
+  const [poll, setPoll] = useState<PollWithOptions | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string>("");
   const [userVotes, setUserVotes] = useState<string[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [isVoting, setIsVoting] = useState(false);
 
   useEffect(() => {
     fetchPoll();
@@ -30,17 +41,12 @@ export default function PollPage() {
   const fetchPoll = async () => {
     try {
       setIsLoading(true);
-      // TODO: Replace with actual API call
-      const response = await fetch(`/api/polls/${pollId}`);
-      
-      if (!response.ok) {
-        throw new Error('Poll not found');
-      }
-      
-      const pollData = await response.json();
+      // Use authenticated API client to fetch poll details
+      const pollData = await api.get<PollWithOptions>(`/api/polls/${pollId}`);
       setPoll(pollData);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load poll';
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to load poll";
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -50,57 +56,54 @@ export default function PollPage() {
 
   const fetchUserVotes = async () => {
     try {
-      // TODO: Replace with actual API call to get user's votes for this poll
-      const response = await fetch(`/api/polls/${pollId}/votes/me`);
-      
-      if (response.ok) {
-        const votesData = await response.json();
-        setUserVotes(votesData.optionIds || []);
-      }
+      if (!user) return;
+
+      // Use authenticated API client to get user's votes for this poll
+      const votesData = await api.get(`/api/polls/${pollId}/votes/me`);
+      setUserVotes(votesData.optionIds || []);
     } catch (err) {
-      console.error('Failed to fetch user votes:', err);
+      console.error("Failed to fetch user votes:", err);
+      // Don't show error toast for votes - it's not critical
     }
   };
 
   const handleVote = async (pollId: string, optionIds: string[]) => {
+    if (!user) {
+      toast.error("Please log in to vote");
+      return;
+    }
+
     try {
-      // TODO: Replace with actual API call
-      const response = await fetch(`/api/polls/${pollId}/vote`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ optionIds }),
-      });
+      setIsVoting(true);
 
-      if (!response.ok) {
-        throw new Error('Failed to submit vote');
-      }
+      // Use authenticated API client to submit vote
+      const result = await api.post(`/api/polls/${pollId}/vote`, { optionIds });
 
-      const result = await response.json();
-      
       // Update local state
       setUserVotes(optionIds);
-      
+
       // Refresh poll data to get updated vote counts
       await fetchPoll();
-      
-      toast.success('Vote submitted successfully!');
+
+      toast.success("Vote submitted successfully!");
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to submit vote';
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to submit vote";
       toast.error(errorMessage);
       throw err;
+    } finally {
+      setIsVoting(false);
     }
   };
 
   const handleShare = async () => {
     const url = window.location.href;
-    
+
     if (navigator.share) {
       try {
         await navigator.share({
           title: poll?.title,
-          text: poll?.description,
+          text: poll?.description || undefined,
           url,
         });
       } catch (err) {
@@ -109,16 +112,16 @@ export default function PollPage() {
     } else {
       try {
         await navigator.clipboard.writeText(url);
-        toast.success('Poll link copied to clipboard!');
+        toast.success("Poll link copied to clipboard!");
       } catch (err) {
-        toast.error('Failed to copy link');
+        toast.error("Failed to copy link");
       }
     }
   };
 
   const showQRCode = () => {
     // TODO: Implement QR code modal
-    toast.info('QR code feature coming soon!');
+    toast.info("QR code feature coming soon!");
   };
 
   if (isLoading) {
@@ -131,7 +134,7 @@ export default function PollPage() {
               Back
             </Button>
           </div>
-          
+
           <div className="space-y-4">
             <div className="h-8 bg-gray-200 rounded animate-pulse" />
             <div className="h-64 bg-gray-100 rounded-lg animate-pulse" />
@@ -151,12 +154,13 @@ export default function PollPage() {
               Back
             </Button>
           </div>
-          
+
           <Card>
             <CardHeader>
               <CardTitle>Poll Not Found</CardTitle>
               <CardDescription>
-                {error || 'The poll you are looking for does not exist or has been removed.'}
+                {error ||
+                  "The poll you are looking for does not exist or has been removed."}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -184,7 +188,7 @@ export default function PollPage() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          
+
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handleShare}>
               <Share2 className="h-4 w-4 mr-2" />
@@ -201,9 +205,10 @@ export default function PollPage() {
         <PollCard
           poll={poll}
           onVote={handleVote}
-          currentUserId={currentUserId}
+          currentUserId={user?.id}
           userVotes={userVotes}
           showResults={false}
+          isLoading={isVoting}
         />
 
         {/* Additional Poll Info */}
@@ -215,31 +220,33 @@ export default function PollPage() {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="font-medium">Total Votes:</span>
-                <span className="ml-2">{poll.totalVotes}</span>
+                <span className="ml-2">{poll.total_votes}</span>
               </div>
               <div>
                 <span className="font-medium">Vote Type:</span>
                 <span className="ml-2">
-                  {poll.allowMultipleVotes ? 'Multiple Choice' : 'Single Choice'}
+                  {poll.allow_multiple_votes
+                    ? "Multiple Choice"
+                    : "Single Choice"}
                 </span>
               </div>
               <div>
                 <span className="font-medium">Anonymous:</span>
-                <span className="ml-2">{poll.isAnonymous ? 'Yes' : 'No'}</span>
+                <span className="ml-2">{poll.is_anonymous ? "Yes" : "No"}</span>
               </div>
               <div>
                 <span className="font-medium">Created:</span>
                 <span className="ml-2">
-                  {new Date(poll.createdAt).toLocaleDateString()}
+                  {new Date(poll.created_at).toLocaleDateString()}
                 </span>
               </div>
             </div>
-            
-            {poll.expiresAt && (
+
+            {poll.expires_at && (
               <div className="pt-2 border-t">
                 <span className="font-medium text-sm">Expires:</span>
                 <span className="ml-2 text-sm">
-                  {new Date(poll.expiresAt).toLocaleString()}
+                  {new Date(poll.expires_at).toLocaleString()}
                 </span>
               </div>
             )}

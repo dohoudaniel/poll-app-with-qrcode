@@ -57,6 +57,19 @@ export interface CreatePollFormData {
   isAnonymous: boolean;
 }
 
+export interface EditPollFormData {
+  id: string;
+  title: string;
+  description?: string;
+  options: PollOption[]; // Use full PollOption objects for editing
+  expiresAt?: Date;
+  allowMultipleVotes: boolean;
+  isAnonymous: boolean;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface LoginFormData {
   email: string;
   password: string;
@@ -103,6 +116,6 @@ export interface AuthFormProps {
 }
 
 // Utility types
-export type PollStatus = 'active' | 'expired' | 'draft';
-export type UserRole = 'user' | 'admin';
-export type VoteType = 'single' | 'multiple';
+export type PollStatus = "active" | "expired" | "draft";
+export type UserRole = "user" | "admin";
+export type VoteType = "single" | "multiple";

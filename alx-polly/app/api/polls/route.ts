@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PollService } from "@/lib/services/poll-service";
-import { getCurrentUser } from "@/lib/supabase";
+import { getCurrentUser, supabase } from "@/lib/supabase";
 import { CreatePollFormData } from "@/types";
 
 // GET /api/polls - Get all polls
